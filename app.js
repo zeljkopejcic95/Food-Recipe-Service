@@ -38,9 +38,9 @@ app.post("/register", function(req, res) {
     connection.query(
       `INSERT INTO users (email, first_name, last_name, password)
        VALUES ("${userEmail}", "${firstName}", "${lastName}", "${hash}");`,
-      function(err, result) {
-        if (err) {
-          console.log(err);
+      function(error, result) {
+        if (error) {
+          console.log(error);
         } else {
           console.log("Successfully registered");
           res.send(result);
@@ -63,13 +63,18 @@ app.post("/login", function(req, res) {
         console.log(err);
       } else {
         if (result) {
-          if (result[0].password === password) {
-            console.log("Successfully logged");
-          }
+          if (result[0].password === bcrypt.compare(password, result[0].password, function(error, data){
+            if (error) {
+              console.log(error);
+            } else {
+              console.log("Successfully logged");
+              console.log(result);
+            }
+          }));
         }
       }
 
-      const token = jwt.sign({result: result[0].email}, process.env.PRIVATE_KEY, {expiresIn: "1h"});
+      const token = jwt.sign({userId: result[0].users_id}, process.env.PRIVATE_KEY, {expiresIn: "1h"});
       res.send({token: token});
     });
 });
@@ -88,68 +93,123 @@ function verifyToken(req, res, next) {
   }
 };
 
+// list all recepies
 
+// app.get("/recipe", verifyToken, function(req, res) {
+//
+//   jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+//     if (err) {
+//       res.sendStatus(403);
+//     } else {
+//       console.log(data.userId);
+//       connection.query(
+//         `SELECT * FROM food_recipe`,
+//         function(error, result) {
+//           if (error) {
+//             console.log(error);
+//           } else {
+//             res.send(result);
+//           }
+//         });
+//     }
+//   });
+// });
 
-app.get("/recipe", verifyToken, function(req, res) {
+// list all recepies from specific user
 
+app.get("/recipe", verifyToken, function (req, res){
   jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
     if (err) {
       res.sendStatus(403);
     } else {
       console.log(data);
-      connection.query(
-        `SELECT * FROM food_recipe`,
-        function(err, result) {
-          if (err) {
-            console.log(err);
-          } else {
-            res.send(result);
-          }
-        });
+      connection.query(`SELECT * FROM food_recipe WHERE users_id = "${data.userId}"`, function (error, result){
+                          if (error) {
+                            console.log(error);
+                          } else {
+                            res.send(result);
+                          }
+                        });
     }
   });
 });
 
-app.post("/recipe", function(req, res) {
+// create new recipe with user ID
 
+app.post("/recipe", verifyToken, function(req, res) {
 
-  const foodName = req.body.name;
-  const foodIngredients = req.body.ingredients;
-  const recipeText = req.body.recipeText;
-  const newRecipe = `INSERT INTO food_recipe (name, ingredients, recipe_text)
-                     VALUES ("${foodName}", "${foodIngredients}", "${recipeText}");`
-
-  connection.query(newRecipe, function(err, result) {
-    if (err) {
-      console.log(err);
-    } else {
-      res.send(result);
-    }
-  });
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    console.log(data);
+    connection.query(`INSERT INTO food_recipe (name, ingredients, recipe_text, users_id)
+                      VALUES ("${req.body.name}", "${req.body.ingredients}", "${req.body.recipeText}", "${data.userId}");`,
+                    function(error, result) {
+                      if (error) {
+                        console.log(error);
+                      } else {
+                        res.send(result);
+                      }
+                    });
+  }
+});
 });
 
-app.get("/ingredients", function(req, res) {
-  connection.query(
-    `SELECT ingredients FROM food_recipe`,
-    function(err, result) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.send(result);
-      }
-    });
+// app.post("/recipe", function (req, res) {
+//
+//
+//   const foodName = req.body.name;
+//   const foodIngredients = req.body.ingredients;
+//   const recipeText = req.body.recipeText;
+//   const newRecipe = `INSERT INTO food_recipe (name, ingredients, recipe_text, users_id)
+//                      VALUES ("${foodName}", "${foodIngredients}", "${recipeText}");`
+//
+//   connection.query(newRecipe, function(err, result) {
+//     if (err) {
+//       console.log(err);
+//     } else {
+//       res.send(result);
+//     }
+//   });
+// });
+
+app.get("/ingredients", verifyToken, function(req, res) {
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `SELECT ingredients FROM food_recipe`,
+      function(error, result) {
+        if (error) {
+          console.log(error);
+        } else {
+          res.send(result);
+        }
+      });
+  }
+ });
 });
 
-app.get("/recipe_text", function(req, res) {
-  connection.query(
-    `SELECT recipe_text FROM food_recipe`,
-    function(err, result) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.send(result);
-      }
-    });
+app.get("/recipe_text", verifyToken, function(req, res) {
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `SELECT recipe_text FROM food_recipe`,
+      function(error, result) {
+        if (error) {
+          console.log(error);
+        } else {
+          res.send(result);
+        }
+      });
+  }
+ });
 });
 
 
@@ -167,58 +227,89 @@ app.get("/recipe_text", function(req, res) {
 // });
 
 
-app.get("/recipe/:recipeId", function(req, res) {
+app.get("/recipe/:recipeId", verifyToken, function(req, res) {
   const recipeId = req.params.recipeId;
-  connection.query(
-    `SELECT * FROM food_recipe WHERE recipe_id = "${recipeId}";`,
-    function(err, result) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.send(result);
-      }
-    });
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `SELECT * FROM food_recipe WHERE recipe_id = "${recipeId}";`,
+      function(error, result) {
+        if (error) {
+          console.log(error);
+        } else {
+          res.send(result);
+        }
+      });
+  }
+ });
 });
 
-app.put("/recipe/:recipeId", function(req, res) {
+app.put("/recipe/:recipeId", verifyToken, function(req, res) {
   const foodName = req.body.name;
   const foodIngredients = req.body.ingredients;
   const recipeText = req.body.recipeText;
-  connection.query(
-    `UPDATE food_recipe
-     SET name = "${foodName}", ingredients = "${foodIngredients}", recipe_text = "${recipeText}"
-     WHERE recipe_id = "${req.params.recipeId}";`,
-    function(err) {
-      if (!err) {
-        res.send("Successfully updated.");
-      }
-    });
+
+  jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+    if (err) {
+      res.sendStatus(403);
+    } else {
+      connection.query(
+        `UPDATE food_recipe
+         SET name = "${foodName}", ingredients = "${foodIngredients}", recipe_text = "${recipeText}", users_id = "${data.userId}"
+         WHERE recipe_id = "${req.params.recipeId}";`,
+         function (error, result) {
+           if (error) {
+             console.log(error);
+           } else {
+             console.log("Successfully updated.");
+             res.send(result);
+           }
+         });
+    }
+  });
 });
 
-app.delete("/recipe/recipeId", function(req, res) {
+app.delete("/recipe/:recipeId", verifyToken, function(req, res) {
   const recipeId = req.params.recipeId;
-  connection.query(
-    `DELETE FROM food recipe WHERE recipe_id = "${recipeId}";`,
-    function(err, result) {
-      if (!err) {
-        res.send("Successfully deleted recipe");
-      }
-    });
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `DELETE FROM food recipe WHERE recipe_id = "${recipeId}";`,
+      function(error, result) {
+        if (!error) {
+          res.send("Successfully deleted recipe");
+        }
+      });
+  }
+ });
 });
 
+// USERS table
 
 
+app.get("/users", verifyToken, function(req, res) {
 
-app.get("/users", function(req, res) {
-  connection.query(
-    `SELECT * FROM users`,
-    function(err, result) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.send(result);
-      }
-    });
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `SELECT first_name, last_name, email FROM users`,
+      function(error, result) {
+        if (error) {
+          console.log(error);
+        } else {
+          res.send(result);
+        }
+      });
+  }
+ });
 });
 
 // app.delete("/users", function(req, res) {
@@ -231,28 +322,42 @@ app.get("/users", function(req, res) {
 //     });
 // });
 
-app.get("/users/:usersId", function(req, res) {
+app.get("/users/:usersId", verifyToken, function(req, res) {
   const usersId = req.params.usersId;
-  connection.query(
-    `SELECT * FROM users WHERE users_id = "${usersId}";`,
-    function(err, result) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.send(result);
-      }
-    });
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `SELECT first_name, last_name, email FROM users WHERE users_id = "${usersId}";`,
+      function(error, result) {
+        if (error) {
+          console.log(error);
+        } else {
+          res.send(result);
+        }
+      });
+  }
+ });
 });
 
-app.delete("/users/usersId", function(req, res) {
+app.delete("/users/:usersId", function(req, res) {
   const usersId = req.params.usersId;
-  connection.query(
-    `DELETE FROM users WHERE users_id = "${usersId}";`,
-    function(err, result) {
-      if (!err) {
-        res.send("Successfully deleted user");
-      }
-    });
+
+jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
+  if (err) {
+    res.sendStatus(403);
+  } else {
+    connection.query(
+      `DELETE FROM users WHERE users_id = "${usersId}";`,
+      function(error, result) {
+        if (!error) {
+          res.send("Successfully deleted user");
+        }
+      });
+  }
+ });
 });
 
 
