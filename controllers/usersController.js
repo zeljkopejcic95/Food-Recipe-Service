@@ -1,21 +1,13 @@
-const connection = require("../models/database");
-const jwt = require("jsonwebtoken");
 require("dotenv").config()
+const jwt = require("jsonwebtoken");
+const usersService = require("../services/usersService");
 
 const getAllUsers = function(req, res) {
   jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
     if (err) {
       res.sendStatus(403);
     } else {
-      connection.query(
-        `SELECT first_name, last_name, email FROM users`,
-        function(error, result) {
-          if (error) {
-            console.log(error);
-          } else {
-            res.send(result);
-          }
-        });
+      usersService.allUsersQuery(req, res);
     }
    });
 }
@@ -25,53 +17,29 @@ const deleteAllUsers = function(req, res) {
     if (err) {
       res.sendStatus(403);
     } else {
-      connection.query(
-        `DELETE FROM users`,
-        function(error, result) {
-          if (error) {
-            console.log(error);
-          } else {
-            res.send("Successfully deleted all users");
-          }
-        });
+      usersService.deleteAllUsersQuery(req, res);
     }
    });
 }
 
 const getOneUserById = function(req, res) {
-  const usersId = req.params.usersId;
 
 jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
   if (err) {
     res.sendStatus(403);
   } else {
-    connection.query(
-      `SELECT first_name, last_name, email FROM users WHERE users_id = "${usersId}";`,
-      function(error, result) {
-        if (error) {
-          console.log(error);
-        } else {
-          res.send(result);
-        }
-      });
+    usersService.oneUserByIdQuery(req, res);
   }
  });
 }
 
 const deleteOneUserById = function(req, res) {
-  const usersId = req.params.usersId;
 
 jwt.verify(req.token, process.env.PRIVATE_KEY, function(err, data) {
   if (err) {
     res.sendStatus(403);
   } else {
-    connection.query(
-      `DELETE FROM users WHERE users_id = "${usersId}";`,
-      function(error, result) {
-        if (!error) {
-          res.send("Successfully deleted user");
-        }
-      });
+    usersService.deleteOneUserByIdQuery(req, res);
   }
  });
 }
